@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="امتحانات مادة اللغة الإنجليزية للأستاذ أيمن سعادة">
+  <meta name="theme-color" content="#6d28d9">
+  <title>امتحانات الأستاذ أيمن سعادة</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --purple: #6d28d9;
+      --light: #f3e8ff;
+      --white: #fff;
+      --text: #222;
+      --muted: #666;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--light);
+      color: var(--text);
+      font-family: Tahoma, Arial, sans-serif;
+    }
+
+    header {
+      padding: 28px 16px;
+      background: var(--purple);
+      color: var(--white);
+      text-align: center;
+    }
+
+    header h1 { margin: 0; font-size: 26px; }
+    header p { margin: 6px 0 0; opacity: .9; }
+    main { max-width: 700px; margin: 20px auto; padding: 0 14px; }
+    section {
+      margin-bottom: 20px;
+      padding: 18px;
+      border-radius: 14px;
+      background: var(--white);
+      box-shadow: 0 2px 8px rgba(109, 40, 217, .15);
+    }
+
+    h2 { margin: 0 0 14px; color: var(--purple); font-size: 20px; }
+    .notice { margin: 0 0 14px; color: var(--muted); line-height: 1.6; }
+    .status { min-height: 1.5em; margin: 0 0 10px; color: var(--muted); }
+    .status.error { color: #b91c1c; }
+    .exam {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 12px;
+      border: 1px solid var(--light);
+      border-radius: 10px;
+    }
+
+    .exam strong { display: block; overflow-wrap: anywhere; }
+    .exam small { color: var(--muted); }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    a.btn, button {
+      padding: 9px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--purple);
+      color: var(--white);
+      cursor: pointer;
+      font: inherit;
+      font-size: 15px;
+      text-decoration: none;
+    }
+
+    button.del { border: 1px solid #b91c1c; background: var(--white); color: #b91c1c; }
+    a.btn:hover, button:hover { opacity: .85; }
+    a.btn:focus-visible, button:focus-visible, input:focus-visible {
+      outline: 3px solid #a78bfa;
+      outline-offset: 2px;
+    }
+
+    label { display: block; margin: 0 0 5px; }
+    input {
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 11px;
+      border: 1px solid #c4b5fd;
+      border-radius: 8px;
+      font: inherit;
+    }
+
+    .empty { padding: 14px; color: #888; text-align: center; }
+    @media (max-width: 480px) {
+      .exam { align-items: flex-start; flex-direction: column; }
+      .actions { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📘 امتحانات الأستاذ أيمن سعادة</h1>
+    <p>The Special One</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="examsHeading">
+      <h2 id="examsHeading">الامتحانات المتوفرة</h2>
+      <div id="examList"></div>
+    </section>
+
+    <section aria-labelledby="addHeading">
+      <h2 id="addHeading">إضافة امتحان جديد</h2>
+      <p class="notice">تُحفظ الامتحانات في هذا المتصفح فقط، ولا تظهر تلقائيًا للزوار الآخرين.</p>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <form id="examForm">
+        <label for="title">عنوان الامتحان</label>
+        <input id="title" name="title" type="text" placeholder="مثال: امتحان الوحدة الأولى" required maxlength="150">
+        <label for="link">رابط ملف الامتحان (PDF أو Google Drive)</label>
+        <input id="link" name="link" type="url" placeholder="https://..." required>
+        <button type="submit">إضافة</button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "aymanSaadehExams";
+    const listEl = document.getElementById("examList");
+    const formEl = document.getElementById("examForm");
+    const titleEl = document.getElementById("title");
+    const linkEl = document.getElementById("link");
+    const statusEl = document.getElementById("status");
+
+    function isValidExam(exam) {
+      if (!exam || typeof exam.title !== "string" || typeof exam.date !== "string" ||
+          typeof exam.link !== "string") {
+        return false;
+      }
+
+      try {
+        const url = new URL(exam.link);
+        return url.protocol === "https:" || url.protocol === "http:";
+      } catch {
+        return false;
+      }
+    }
+
+    function showStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle("error", isError);
+    }
+
+    function loadExams() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        const parsed = saved ? JSON.parse(saved) : [];
+        if (!Array.isArray(parsed)) {
+          throw new Error("Invalid saved exam list");
+        }
+
+        const validExams = parsed.filter(isValidExam);
+        if (validExams.length !== parsed.length) {
+          showStatus("تم تجاهل بيانات امتحانات غير صالحة محفوظة في هذا المتصفح.", true);
+        }
+        return validExams;
+      } catch {
+        showStatus("تعذر قراءة البيانات المحلية. تحقق من إعدادات التخزين في المتصفح.", true);
+        return [];
+      }
+    }
+
+    let exams = loadExams();
+
+    function saveExams(nextExams) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextExams));
+        return true;
+      } catch {
+        showStatus("تعذر حفظ البيانات في هذا المتصفح. تحقق من مساحة التخزين وإعداداته.", true);
+        return false;
+      }
+    }
+
+    function render() {
+      listEl.replaceChildren();
+      if (exams.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "لا توجد امتحانات حتى الآن";
+        listEl.append(empty);
+        return;
+      }
+
+      exams.forEach((exam, index) => {
+        const row = document.createElement("div");
+        row.className = "exam";
+
+        const info = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = exam.title;
+        const date = document.createElement("small");
+        date.textContent = exam.date;
+        info.append(title, date);
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const openLink = document.createElement("a");
+        openLink.className = "btn";
+        openLink.href = exam.link;
+        openLink.target = "_blank";
+        openLink.rel = "noopener noreferrer";
+        openLink.textContent = "فتح الملف";
+
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "del";
+        deleteButton.type = "button";
+        deleteButton.textContent = "حذف";
+        deleteButton.setAttribute("aria-label", `حذف ${exam.title}`);
+        deleteButton.addEventListener("click", () => {
+          const nextExams = exams.filter((_, currentIndex) => currentIndex !== index);
+          if (saveExams(nextExams)) {
+            exams = nextExams;
+            render();
+            showStatus("تم حذف الامتحان من هذا المتصفح.");
+          }
+        });
+
+        actions.append(openLink, deleteButton);
+        row.append(info, actions);
+        listEl.append(row);
+      });
+    }
+
+    formEl.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const title = titleEl.value.trim();
+      const link = linkEl.value.trim();
+      if (!title || !link) {
+        showStatus("أدخل عنوان الامتحان ورابطه.", true);
+        return;
+      }
+
+      let url;
+      try {
+        url = new URL(link);
+      } catch {
+        showStatus("أدخل رابطًا كاملًا يبدأ بـ https:// أو http://.", true);
+        return;
+      }
+
+      if (url.protocol !== "https:" && url.protocol !== "http:") {
+        showStatus("يجب أن يبدأ الرابط بـ https:// أو http://.", true);
+        return;
+      }
+      
+      const nextExams = [...exams, {
+        title,
+        link: url.href,
+        date: new Date().toLocaleDateString("ar")
+      }];
+      if (saveExams(nextExams)) {
+        exams = nextExams;
+        render();
+        formEl.reset();
+        showStatus("تمت إضافة الامتحان وحفظه في هذا المتصفح.");
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>
